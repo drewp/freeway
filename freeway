@@ -1,0 +1,45 @@
+#!/usr/bin/python
+
+import sys, optparse, inspect
+from twisted.web import http, server, client
+from twisted.web.resource import Resource
+from twisted.internet import reactor, defer
+import twisted.web
+from twisted.python import log
+from zope.interface import implements, providedBy
+from nevow import json, rend, appserver, inevow, tags as T, loaders, static
+
+from measurements import getMeasurements
+
+measurements = list(getMeasurements())
+
+class Main(rend.Page):
+    docFactory = loaders.stan([T.raw('''<?xml version="1.0" encoding="utf-8"?>
+    <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+    "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">'''),
+                T.html(xmlns="http://www.w3.org/1999/xhtml")[
+            T.head[T.style[T.raw('''
+            * { font-family: sans-serif; }
+            table {
+            border-collapse: collapse;
+            }
+            table, td, th {
+             border: 1px solid gray;
+             padding: 3px;
+            }
+            ''')]],
+           T.body[
+        T.directive('table'),
+        T.div[T.a(href="http://pems.eecs.berkeley.edu/")["Data from PeMS, Caltrans"]],
+        ]]])
+
+    def render_table(self, ctx, data):
+        import segment_report
+        reload(segment_report)
+        return segment_report.table(measurements)
+
+if __name__ == '__main__':
+    log.startLogging(sys.stdout)
+    reactor.listenTCP(8009, appserver.NevowSite(Main()))
+    reactor.run()
+
