@@ -18,7 +18,7 @@ def parseVdsConfig(filename, district=4):
                           district):
         d = {}
         for attr in ['name', 'type', 'freeway_id', 'freeway_dir',
-                     'abs_postmile', 'latitude', 'longitude']:
+                     'abs_pm', 'latitude', 'longitude']:
             d[attr] = vds.get(attr)
         result[vds.get('id')] = d
 

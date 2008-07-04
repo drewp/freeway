@@ -3,20 +3,8 @@ boring map-layout of green..red dots according to speed
 """
 from __future__ import division
 import random
-from loop_data import parse5MinFile
-from detector import parseVdsConfig
 from nevow import flat, tags as T
-
-def getMeasurements():
-    """yields dicts with all the attributes from the vds and from
-    the sensor data file"""
-    vds = parseVdsConfig("vds_config.xml")
-    for sens in parse5MinFile("5minagg_latest.txt.gz"):
-        try:
-            sens.update(vds[sens['vds_id']])
-            yield sens
-        except KeyError:
-            print "no vds data for vds_id %s" % sens['vds_id']
+from measurements import getMeasurements
 
 def interp(x, lo, hi, outLo, outHi):
     return outLo + (outHi - outLo) * max(0, min(1, (x - lo) / (hi - lo)))
