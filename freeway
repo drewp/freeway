@@ -63,8 +63,10 @@ table, td, th {
             T.table[
             T.tr[T.td["Data timestamp says "],
                  T.td[iso8601.tostring(latestMeas.lastDataTime, time.altzone)]],
-            T.tr[T.td["Last read at "],
+            T.tr[T.td["Last fetched at "],
                  T.td[iso8601.tostring(latestMeas.lastFtpTime, time.altzone)]],
+            T.tr[T.td["Page generated at "],
+                 T.td[iso8601.tostring(int(time.time()), time.altzone)]],
             ]]
 
 if __name__ == '__main__':

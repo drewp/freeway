@@ -15,7 +15,8 @@ def table(updatingMeasurements):
 
     meas.sort()
 
-    rows = [T.tr[T.th(colspan=4)['N'], T.th(colspan=4)['S']],
+    rows = [T.tr[T.th(colspan=4, class_="dir-N")['North'],
+                 T.th(colspan=4, class_="dir-S")['South']],
             T.tr[T.th['fwy'], T.th['postmile'], T.th['name'], T.th['speed'],
                  T.th['fwy'], T.th['postmile'], T.th['name'], T.th['speed']]]
     for _, m in meas:

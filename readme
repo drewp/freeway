@@ -17,3 +17,8 @@ After a while, I should be able to start sending you alerts if i think
 you were about to start the drive and the traffic behavior is above
 your threshold.
 
+plan 3:
+
+Draw the usual map, but then simulate little cars driving on it at the
+correct speeds. Maybe this will be easier to read than the usual
+green/yellow/red stuff.
