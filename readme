@@ -1,0 +1,19 @@
+plan 1:
+
+Display speed data in a way that shows a few recent speeds too, so I
+can see if a slow area is moving or not. 
+
+
+plan 2:
+
+After every freeway drive you do, find a computer and fill out my survey:
+
+  1. What exits did you start/end with?
+
+  2. Was the traffic bad enough that you would have wanted an alert to
+     go another way?
+
+After a while, I should be able to start sending you alerts if i think
+you were about to start the drive and the traffic behavior is above
+your threshold.
+
