@@ -19,18 +19,29 @@ class UpdatingMeasurements(object):
         task.LoopingCall(self.update).start(5 * 60)
 
     def update(self):
-        if os.path.getmtime("spool/5minagg_latest.txt.gz") < time.time() - 295:
-            os.system("./ftp_get")
-            
-        self.lastFtpTime = int(time.time())
-
-        new = []
-        timestamp, samples = parse5MinFile("spool/5minagg_latest.txt.gz")
-        for sens in samples:
+        try:
             try:
-                sens.update(self.vds[sens['vds_id']])
-                new.append(sens)
-            except KeyError:
-                print "no vds data for vds_id %s" % sens['vds_id']
-        self.lastDataTime = timestamp
-        self.measurements[:] = new
+                last = os.path.getmtime("spool/5minagg_latest.txt.gz")
+            except OSError:
+                last = None
+            if last < time.time() - 295:
+                print "fetching:"
+                ret = os.system("./ftp_get")
+                print "done", ret
+
+            self.lastFtpTime = int(time.time())
+
+            new = []
+            timestamp, samples = parse5MinFile("spool/5minagg_latest.txt.gz")
+            for sens in samples:
+                try:
+                    sens.update(self.vds[sens['vds_id']])
+                    new.append(sens)
+                except KeyError:
+                    print "no vds data for vds_id %s" % sens['vds_id']
+            self.lastDataTime = timestamp
+            self.measurements[:] = new
+        except Exception, e:
+            print "update failed:", e
+            self.lastDataTime = None
+            self.measurements = []
