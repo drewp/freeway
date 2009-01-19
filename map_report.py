@@ -4,7 +4,7 @@ boring map-layout of green..red dots according to speed
 from __future__ import division
 import random
 from nevow import flat, tags as T
-from measurements import getMeasurements
+from measurements import UpdatingMeasurements
 
 def interp(x, lo, hi, outLo, outHi):
     return outLo + (outHi - outLo) * max(0, min(1, (x - lo) / (hi - lo)))
@@ -14,7 +14,7 @@ def mapHtml():
     height = 900
 
     dots = []
-    for measurement in getMeasurements():
+    for measurement in UpdatingMeasurements().measurements:
         try:
             speed = float(measurement['speed'])
         except ValueError:
@@ -40,7 +40,7 @@ def mapHtml():
             T.html(xmlns="http://www.w3.org/1999/xhtml")[
         T.head[T.style[T.raw('''
         * {
-        font-size: 50%;
+        font-size: 90%;
         }
         ''')]],
         T.body[

@@ -1,4 +1,6 @@
 import os, time
+import cPickle as pickle
+from glob import glob
 from twisted.internet import task
 
 from loop_data import parse5MinFile
@@ -11,12 +13,16 @@ class UpdatingMeasurements(object):
     look at self.measurements, self.lastFtpTime, self.lastDataTime
 
     """
-    def __init__(self):
+    def __init__(self, runLoop=True, runOnce=True):
         self.vds = parseVdsConfig("vds_config.xml")
         self.measurements = []
         self.lastFtpTime = None
         self.lastDataTime = None
-        task.LoopingCall(self.update).start(5 * 60)
+        if runLoop:
+            task.LoopingCall(self.update).start(5 * 60)
+        else:
+            if runOnce:
+                self.update()
 
     def update(self):
         try:
@@ -41,7 +47,22 @@ class UpdatingMeasurements(object):
                     print "no vds data for vds_id %s" % sens['vds_id']
             self.lastDataTime = timestamp
             self.measurements[:] = new
+
+            f = open("spool/meas.%s" % timestamp, "w")
+            pickle.dump((timestamp, self.measurements), f, protocol=-1)
+            f.close()
+            
         except Exception, e:
             print "update failed:", e
             self.lastDataTime = None
             self.measurements = []
+
+def getRecentSets(n=5):
+    """most recent time,measurements first, then n-1 more of those pairs"""
+    times = [float(x.split('.', 1)[1]) for x in glob("spool/meas.*")]
+    times.sort(reverse=True)
+    for t in times[:n]:
+        f = open("spool/meas.%s" % t)
+        timestamp, meas = pickle.load(f)
+        f.close()
+        yield timestamp, meas

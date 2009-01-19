@@ -13,7 +13,7 @@ from nevow import json, rend, appserver, inevow, tags as T, loaders, static
 
 from measurements import UpdatingMeasurements
 
-latestMeas = UpdatingMeasurements()
+latestMeas = UpdatingMeasurements(runLoop=True, runOnce=False)
 
 class Main(rend.Page):
     docFactory = loaders.stan([T.raw('''<?xml version="1.0" encoding="utf-8"?>
@@ -47,11 +47,17 @@ table, td, th {
 .dir-S { background: #fcf; }
             ''')]],
            T.body[
-        T.directive('table'),
+        #T.directive('table'),
+        T.directive('hist'),
         T.directive('timing'),
         T.div(class_="credit")[T.a(href="http://pems.eecs.berkeley.edu/")[
         "Data from PeMS, Caltrans"]],
         ]]])
+
+    def renderHTTP(self, ctx):
+        req = inevow.IRequest(ctx)
+        req.setHeader('Content-type', 'application/xhtml+xml')
+        return rend.Page.renderHTTP(self, ctx)
 
     def render_table(self, ctx, data):
         import segment_report
@@ -68,6 +74,18 @@ table, td, th {
             T.tr[T.td["Page generated at "],
                  T.td[iso8601.tostring(int(time.time()), time.altzone)]],
             ]]
+
+    def render_hist(self, ctx):
+        import route_history_report
+        reload(route_history_report)
+        D = route_history_report.Diagram
+        return [T.div[T.h2['Southbound'],
+                      D(shadows=True, freewayDir='S').render()
+                      ],
+                T.div[T.h2['Northbound'],
+                      D(shadows=True, freewayDir='N').render()
+                      ]]
+                      
 
 if __name__ == '__main__':
     log.startLogging(sys.stdout)

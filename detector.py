@@ -1,3 +1,7 @@
+# you have to NOT have ubuntu pkg 'python-stats' installed, since its
+# io.py module breaks lxml.
+# http://www.mail-archive.com/debian-bugs-rc@lists.debian.org/msg155370.html
+# or https://bugs.launchpad.net/ubuntu/+source/lxml/+bug/287895
 import lxml.etree
 
 def parseVdsConfig(filename, district=4):
