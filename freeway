@@ -75,16 +75,20 @@ table, td, th {
                  T.td[iso8601.tostring(int(time.time()), time.altzone)]],
             ]]
 
-    def render_hist(self, ctx):
+    def render_hist(self, ctx, data):
         import route_history_report
         reload(route_history_report)
         D = route_history_report.Diagram
+        shadows = True
+        if ctx.arg('shadow') == 'off':
+            shadows = False
         return [T.div[T.h2['Southbound'],
-                      D(shadows=True, freewayDir='S').render()
+                      D(shadows=shadows, freewayDir='S').render()
                       ],
                 T.div[T.h2['Northbound'],
-                      D(shadows=True, freewayDir='N').render()
-                      ]]
+                      D(shadows=shadows, freewayDir='N').render()
+                      ],
+                T.div[T.a(href="?shadow=off")["(turn off shadows)"]]]
                       
 
 if __name__ == '__main__':

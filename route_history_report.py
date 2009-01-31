@@ -261,13 +261,20 @@ class Diagram(object):
         for pos, speedCol, variance in zip(self.positions,
                                            self.speeds.transpose(),
                                            self.speeds.var(axis=0)):
-            smoothedY = smoothSequence(speedCol, kernelWidth=8)
+            smoothedY = smoothSequence(speedCol, kernelWidth=5)
 
             # speed vector was newest -> oldest
             smoothedY = list(reversed(smoothedY))
             # now it's old->new
 
-            dx = 4
+
+            # it looks bad when the very last point has changed
+            # direction, but it's completely lost in the smoothed
+            # version
+            smoothedY.append(speedCol[-1])
+
+
+            dx = 5
             startXOffset = len(smoothedY) * dx / 2
 
             d = "M%.02f,%.02f" % (self.svgX(pos) - startXOffset,
