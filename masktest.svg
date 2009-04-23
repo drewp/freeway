@@ -43,10 +43,13 @@
        width="1.1900000000000002"
        height="1.5400000000000005"
        y="-0.25000000000000011">
+      <feGaussianBlur
+         stdDeviation="0.59999999999999998"
+         id="feGaussianBlur2395" />
       <feSpecularLighting
          id="feSpecularLighting2427"
          lighting-color="rgb(208,0,0)"
-         surfaceScale="760.56338028169023"
+         surfaceScale="74.074074074074176"
          specularConstant="5.9602649006622519"
          specularExponent="5.7625000000000002"
          kernelUnitLength="0.01">
@@ -55,8 +58,8 @@
            pointsAtX="406"
            x="181"
            y="99"
-           specularExponent="35"
-           limitingConeAngle="50"
+           specularExponent="5"
+           limitingConeAngle="66"
            pointsAtY="338"
            z="3"
            pointsAtZ="-35" />
@@ -105,16 +108,16 @@
      objecttolerance="10"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.62854971"
-     inkscape:cx="431.55592"
-     inkscape:cy="570.63714"
+     inkscape:zoom="2.234917"
+     inkscape:cx="471.86883"
+     inkscape:cy="206.52795"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
      inkscape:window-width="1040"
      inkscape:window-height="1160"
-     inkscape:window-x="0"
-     inkscape:window-y="379" />
+     inkscape:window-x="1034"
+     inkscape:window-y="180" />
   <metadata
      id="metadata2414">
     <rdf:RDF>
