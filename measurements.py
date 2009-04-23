@@ -5,7 +5,7 @@ from twisted.internet import task
 
 from loop_data import parse5MinFile
 from detector import parseVdsConfig
-
+from memoize import lru_cache
 
 class UpdatingMeasurements(object):
     """set of measurements that keeps itself up to date
@@ -48,7 +48,10 @@ class UpdatingMeasurements(object):
             self.lastDataTime = timestamp
             self.measurements[:] = new
 
-            f = open("spool/meas.%s" % timestamp, "w")
+            outDir = os.path.dirname(filenameForTime(timestamp))
+            if not os.path.isdir(outDir):
+                os.makedirs(outDir)
+            f = open(filenameForTime(timestamp), "w")
             pickle.dump((timestamp, self.measurements), f, protocol=-1)
             f.close()
             
@@ -59,10 +62,25 @@ class UpdatingMeasurements(object):
 
 def getRecentSets(n=5):
     """most recent time,measurements first, then n-1 more of those pairs"""
-    times = [float(x.split('.', 1)[1]) for x in glob("spool/meas.*")]
-    times.sort(reverse=True)
-    for t in times[:n]:
-        f = open("spool/meas.%s" % t)
-        timestamp, meas = pickle.load(f)
-        f.close()
+    for filename in recentFilenames(n):
+        timestamp, meas = loadFile(filename)
         yield timestamp, meas
+
+@lru_cache(40)
+def loadFile(filename):
+    f = open(filename)
+    timestamp, meas = pickle.load(f)
+    f.close()
+    return timestamp, meas
+
+def filenameForTime(t):
+    s = str(int(t))
+    w1, w2 = s[:-5], s[-5:]
+    return "spool/meas.%s/%s" % (w1, s)
+
+def recentFilenames(n):
+    times = []
+    for recentDir in sorted(glob("spool/meas.*"), reverse=True)[-2:]:
+        times.extend(glob("%s/*" % recentDir))
+    times.sort(reverse=True)
+    return times[:n]
