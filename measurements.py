@@ -80,7 +80,7 @@ def filenameForTime(t):
 
 def recentFilenames(n):
     times = []
-    for recentDir in sorted(glob("spool/meas.*"), reverse=True)[-2:]:
+    for recentDir in sorted(glob("spool/meas.*"))[-2:]:
         times.extend(glob("%s/*" % recentDir))
     times.sort(reverse=True)
     return times[:n]
