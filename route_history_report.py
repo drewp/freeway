@@ -12,7 +12,7 @@ path = T.Proto('path')
 line = T.Proto('line')
 
 def plotPoints(measurementSets, freewayId='101',
-               postMileLow=408, postMileHigh=412.5, freewayDir='S'):
+               postMileLow=408, postMileHigh=425.5, freewayDir='S'):
     """
     measurementSets is a sequence of timestamp,measurements
 
@@ -69,7 +69,7 @@ class Diagram(object):
         self.bottomMargin = 80
         
         self.pmLow = 408
-        self.pmHigh = 412.5
+        self.pmHigh = 425.5
         self.pixelPerMile = self.width / (self.pmHigh - self.pmLow)
 
         if 1:
