@@ -271,7 +271,7 @@ class Diagram(object):
             # it looks bad when the very last point has changed
             # direction, but it's completely lost in the smoothed
             # version
-            smoothedY.append(speedCol[-1])
+            smoothedY.append(speedCol[0])
 
 
             dx = 5
