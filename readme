@@ -22,3 +22,14 @@ plan 3:
 Draw the usual map, but then simulate little cars driving on it at the
 correct speeds. Maybe this will be easier to read than the usual
 green/yellow/red stuff.
+
+
+2010 code plan:
+
+freeway/ingest/ parsers; periodic reader; mongo writer
+freeway/webapp/ web.py rewrite
+
+
+Sources:
+
+wget http://pems.dot.ca.gov/vds_config.xml
