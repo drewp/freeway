@@ -9,7 +9,7 @@ def parse5MinFile(filename):
      'speed': '69.3'})
 
     docs at:
-    http://pems.eecs.berkeley.edu/?dnode=Help&content=help_var&tab=var_fmt
+    http://pems.dot.ca.gov/?dnode=Help&content=help_var&tab=var_fmt
     """
     txt = gzip.open(filename).read()
     lines = txt.splitlines()

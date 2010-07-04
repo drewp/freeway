@@ -14,7 +14,7 @@ def parseVdsConfig(filename, district=4):
      'latitude':'37.316287', 'freeway_id': '280', 'freeway_dir': 'N'}
 
     docs at
-    http://pems.eecs.berkeley.edu/?dnode=Help&content=help_var&tab=var_fmt#cfg
+    http://pems.dot.ca.gov/?dnode=Help&content=help_var&tab=var_fmt#cfg
     """
     tree = lxml.etree.parse(open(filename))
     result = {}

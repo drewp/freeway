@@ -50,7 +50,7 @@ table, td, th {
         #T.directive('table'),
         T.directive('hist'),
         T.directive('timing'),
-        T.div(class_="credit")[T.a(href="http://pems.eecs.berkeley.edu/")[
+        T.div(class_="credit")[T.a(href="http://pems.dot.ca.gov/")[
         "Data from PeMS, Caltrans"]],
         ]]])
 
