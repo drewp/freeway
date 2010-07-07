@@ -4,52 +4,31 @@ diagram of one route, showing the last few measurements
 from __future__ import division
 import pickle, time
 from nevow import tags as T, flat
-from measurements import getRecentSets
 import numpy
 from numpy import array
+from pymongo import Connection, DESCENDING
+from memoize import lru_cache
+
+db = Connection('bang', 27017)['freeway']
 
 path = T.Proto('path')
 line = T.Proto('line')
 
-def plotPoints(measurementSets, freewayId='101',
-               postMileLow=408, postMileHigh=425.5, freewayDir='S'):
-    """
-    measurementSets is a sequence of timestamp,measurements
+@lru_cache(1000)
+def getVds(id):
+    return db['vds'].find({'_id' : id}).next()
 
-    output is 3 arrays:
+@lru_cache(1000)
+def getLabel(freewayId, postMile):
+    return db['vds'].find_one({'freeway_id' : freewayId, 'abs_pm' : float(postMile)},
+                          ["name"])['name']
 
-    positions = [pos1, pos2, ...] # (postmile)
-    times = [t1, t2, ...]
-    speeds = [[pos1t1spd, pos2t1spd, ...],
-              [pos1t2spd, pos2t2spd, ...]] # newest row is ON TOP
-    labels = { postmile : name }
-    """
-    positions = []
-    times = []
-    speeds = []
-    labels = {}
-    for timestamp, measurements in measurementSets:
-        meas = []
-        for m in measurements:
-            # (but consider beyond my strip, to see approaching traffic)
-            pos = float(m['abs_pm'])
-            if (m['freeway_id'] == freewayId and
-                postMileLow < pos < postMileHigh and
-                m['freeway_dir'] == freewayDir):
-                meas.append((pos, float(m['speed'])))
-                if pos not in labels:
-                    labels[pos] = m['name']
-        meas.sort()
 
-        if not positions:
-            positions = [pos for pos, speed in meas]
-        else:
-            assert positions == [pos for pos, speed in meas]
-        times.append(timestamp)
-        speeds.append([speed for pos, speed in meas])
+#fix flaky graph, add server-rendered rsvg mode
 
-    
-    return array(positions), array(times), array(speeds), labels
+
+
+
 
 def smoothSequence(x, kernelWidth=5):
     """returned sequence is shorter"""
@@ -72,19 +51,76 @@ class Diagram(object):
         self.pmHigh = 425.5
         self.pixelPerMile = self.width / (self.pmHigh - self.pmLow)
 
-        if 1:
-            t1 = time.time()
-            data = getRecentSets(10)
-            positions, times, speeds, labels = plotPoints(data, **kw)
-            print "fetch data in %s" % (time.time() - t1)
-            pickle.dump((positions, times, speeds, labels),
-                        open("/tmp/fwy.p", 'w'), -1)
-        else:
-            positions, times, speeds, labels = pickle.load(open("/tmp/fwy.p"))
+        t1 = time.time()
+        self.positions, self.times, self.speeds = self.plotPoints(**kw)
+        print "fetch data in %s" % (time.time() - t1)
             
-        self.positions, self.times, self.speeds = positions, times, speeds
-        self.labels = labels
-        self.speedRange = (speeds.min() - 3, speeds.max() + 3)
+        self.speedRange = (
+            0, #self.speeds.min() - 3,
+            80, #self.speeds.max() + 3
+            )
+
+    def plotPoints(self, freewayId='101',
+                   postMileLow=408, postMileHigh=425.5, freewayDir='S'):
+        """
+        measurementSets is a sequence of lists of measurements from the same time
+
+        output is 3 arrays:
+
+        positions = [pos1, pos2, ...] # (postmile)
+        times = [t1, t2, ...]
+        speeds = [[pos1t1spd, pos2t1spd, ...],
+                  [pos1t2spd, pos2t2spd, ...]] # newest row is ON TOP
+        """
+        vdsInRange = [row['_id'] for row in
+                      db['vds'].find({'freeway_id' : '101',
+                                      'abs_pm' : {'$gt' : 408, '$lt' : 425.5}},
+                                     fields=['_id'])]
+
+        data = list(db['meas'].find({'vds_id' : {'$in' : vdsInRange}}
+                                    ).sort('time', DESCENDING
+                                           ).limit(10 * len(vdsInRange)))
+        self.latestRow = data[0]
+        measurementSets = {} # time : [meas]
+        for row in data:
+            measurementSets.setdefault(row['time'], []).append(row)
+
+
+        positions = []
+        times = []
+        speeds = []
+
+        allPos = set()
+        for measurements in measurementSets.values():
+            for m in measurements:
+                vds = getVds(m['vds_id'])
+                if (vds['freeway_id'] == freewayId and
+                    postMileLow < vds['abs_pm'] < postMileHigh and
+                    vds['freeway_dir'] == freewayDir):
+                    allPos.add(getVds(m['vds_id'])['abs_pm'])
+        positions = sorted(allPos)
+        print "freewayDir %s, %s" % (freewayDir, positions[:5])
+
+        for measurements in measurementSets.values():
+            speedAtPos = {} # abs_pm : speed
+
+            for m in measurements:
+                # (but consider beyond my strip, to see approaching traffic)
+                vds = getVds(m['vds_id'])
+                pos = vds['abs_pm']
+                if (vds['freeway_id'] == freewayId and
+                    postMileLow < pos < postMileHigh and
+                    vds['freeway_dir'] == freewayDir):
+                    assert pos in allPos
+                    speedAtPos[pos] = m['speed']
+
+            times.append(time.mktime(m['time'].timetuple())) # pick any measurement from the set
+            speeds.append([speedAtPos.get(pos, None) for pos in positions])
+
+
+
+        return array(positions), array(times), array(speeds)
+
         
     def render(self):
         defs = []
@@ -99,13 +135,13 @@ class Diagram(object):
             defs.extend(d)
             elements.append(T.Tag('g')[e])
 
-        return T.Tag('svg')(xmlns="http://www.w3.org/2000/svg",
+        return flat.flatten(T.Tag('svg')(xmlns="http://www.w3.org/2000/svg",
                             style="background: #ddd;",
                             width=self.width, height=self.height,
                             **{'xmlns:xlink':"http://www.w3.org/1999/xlink"})[
             T.Tag('style')[T.raw(self.style)],
             T.Tag('defs')[defs, T.raw(self.staticDefs)],
-            elements]
+            elements])
 
     style = '''
         path.direction {
@@ -144,7 +180,7 @@ class Diagram(object):
         }
         text.pos {
           font-family: Verdana;
-          font-size: 13px;
+          font-size: 10px;
         }
         '''
     
@@ -183,7 +219,10 @@ class Diagram(object):
             spacing = 2
         
         for speed in range(90, 0, -spacing):
-            y = self.svgY(speed)
+            try:
+                y = self.svgY(speed)
+            except TypeError:
+                continue
             if not 10 < y < self.height - self.bottomMargin:
                 continue
             txt = str(speed)
@@ -207,9 +246,8 @@ class Diagram(object):
             if lastX and x - lastX < 20:
                 continue
             lastX = x
-            tr = "translate(%s %s) rotate(14)" % (x, base + 25)
-            elements.append(T.Tag('text')(transform=tr, class_="pos")[
-                self.labels[pos]])
+            tr = "translate(%s %s) rotate(-90)" % (x, base + 75)
+            elements.append(T.Tag('text')(transform=tr, class_="pos")["%6.2f %s" % (pos, getLabel('101', pos))])
         return [], elements
     
     def makeSpeedCurves(self):
@@ -222,7 +260,12 @@ class Diagram(object):
             smallestDiffMile = min(p2[0] - p1[0]
                                    for p1, p2 in zip(meas[:-1], meas[1:]))
 
-            pts = [(self.svgX(pos), self.svgY(speed)) for pos, speed in meas]
+            pts = []
+            for pos, speed in meas:
+                try:
+                    pts.append((self.svgX(pos), self.svgY(speed)))
+                except TypeError:
+                    continue
 
             d = "M%.02f,%.02f" % tuple(pts[0])
             for p1, p2 in zip(pts[:-1], pts[1:]):
@@ -230,7 +273,7 @@ class Diagram(object):
                     p2[0] - smallestDiffMile * self.pixelPerMile, p2[1],
                     p2[0], p2[1])
 
-            rowFrac = rowNum / (len(self.times) - 1)
+            rowFrac = rowNum / max(1, len(self.times) - 1)
             lineWidth = (1 - rowFrac) * 3 + rowFrac * 0
 
             pathId = "speed-%s-%s" % (id(self), rowNum)
@@ -258,21 +301,22 @@ class Diagram(object):
         """the little sparkline-ish arrows that show how each
         datapoint is changing"""
         elements = []
-        for pos, speedCol, variance in zip(self.positions,
-                                           self.speeds.transpose(),
-                                           self.speeds.var(axis=0)):
-            smoothedY = smoothSequence(speedCol, kernelWidth=5)
+
+        for pos, speedCol in zip(self.positions, self.speeds.transpose()):
+            #variance = speeds.var(axis=0)
+            try:
+                smoothedY = smoothSequence(speedCol, kernelWidth=5)
+            except TypeError: # nones in the data
+                continue
 
             # speed vector was newest -> oldest
             smoothedY = list(reversed(smoothedY))
             # now it's old->new
 
-
             # it looks bad when the very last point has changed
             # direction, but it's completely lost in the smoothed
             # version
             smoothedY.append(speedCol[0])
-
 
             dx = 5
             startXOffset = len(smoothedY) * dx / 2

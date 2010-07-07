@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <style type="text/css" media="all">
+    /* <![CDATA[ */
+    * { font-family: sans-serif; }
+    table {
+	border-collapse: collapse;
+    }
+    table, td, th {
+	border: 1px solid gray;
+	padding: 3px;
+    }
+    .timing {
+	margin-top: 1em;
+	border: 1px solid #ccc;
+	width: 30em;
+    }
+    .timing table, .timing td {
+	border: 0;
+    }
+    .credit {
+	margin-top: 1em;
+	border: 1px solid #ccc;
+	padding: .3em;
+	background: #eee;
+    }          
+    .dir-N { background: #cfc; }
+    .dir-S { background: #fcf; }
+
+    /* ]]> */
+</style>
+</head>
+<body>
+  <!--${Markup(table)}-->
+
+  <div><h2>Southbound</h2>
+  ${Markup(diaSouth.render())}
+  </div>
+  <div><h2>Northbound</h2>
+  ${Markup(diaNorth.render())}
+  </div>
+  <div><a href="?shadow=off">(turn off shadows)</a></div>
+  <div class="timing">
+    <table>
+      <tr>
+	<td>Data timestamp says</td><td>${dataTime}</td>
+      </tr>
+      <tr>
+	<td>Fetched at</td><td>${fetchTime}</td>
+      </tr>
+      <tr>
+	<td>Page generated at</td><td>${now}</td>
+      </tr>
+    </table>
+  </div>
+  <div class="credit"><a href="http://pems.dot.ca.gov/">Data from PeMS, Caltrans</a></div>
+</body>
+</html>

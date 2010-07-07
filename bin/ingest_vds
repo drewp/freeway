@@ -23,6 +23,7 @@ db.drop_collection('vds')
 for id, vds in newData.items():
     vds['_id'] = str(id)
 
+    vds['abs_pm'] = float(vds['abs_pm'])
     vds['pos'] = bson.SON([('longitude', float(vds['longitude'])),
                            ('latitude', float(vds['latitude']))])
     del vds['longitude']

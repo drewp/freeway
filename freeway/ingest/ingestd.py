@@ -42,20 +42,21 @@ class UpdateLoop(object):
 def mongoFromTimestamp(t):
     return datetime.datetime.fromtimestamp(t, dateutil.tz.tzutc())
 
-def mongoSave(db, t, fetchTime, pts):
-    for pt in pts:
-        pt['time'] = mongoFromTimestamp(t)
-        pt['fetchTime'] = mongoFromTimestamp(fetchTime)
-        pt['num_samples'] = int(pt['num_samples'])
-        del pt['travel_time'] # docs: "not in use"
+def mongoSave(db, t, fetchTime, stations):
+    for station in stations:
+        station['time'] = mongoFromTimestamp(t)
+        if fetchTime is not None:
+            station['fetchTime'] = mongoFromTimestamp(fetchTime)
+        station['num_samples'] = int(station['num_samples'])
+        del station['travel_time'] # docs: "not in use"
 
         for k in ['delay', 'pct_observed', 'vht', 'vmt', 'flow',
                   'occupancy', 'q', 'speed',]:
             try:
-                pt[k] = float(pt[k])
+                station[k] = float(station[k])
             except ValueError: # empty string?
-                pt[k] = None
-        db['meas'].save(pt)
+                pass
+        db['meas'].save(station)
 
 
 def getRecentSets(n=5):

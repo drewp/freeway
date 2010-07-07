@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec spawn -p 9999 --processes=1 --threads=0 freeway.webapp.app.application
