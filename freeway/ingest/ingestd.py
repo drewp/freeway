@@ -42,7 +42,7 @@ class UpdateLoop(object):
 def mongoFromTimestamp(t):
     return datetime.datetime.fromtimestamp(t, dateutil.tz.tzutc())
 
-def mongoSave(db, t, fetchTime, stations):
+def mongoSave(db, t, fetchTime, stations, collection='meas'):
     for station in stations:
         station['time'] = mongoFromTimestamp(t)
         if fetchTime is not None:
@@ -56,7 +56,7 @@ def mongoSave(db, t, fetchTime, stations):
                 station[k] = float(station[k])
             except ValueError: # empty string?
                 pass
-        db['meas'].save(station)
+        db[collection].save(station)
 
 
 def getRecentSets(n=5):
