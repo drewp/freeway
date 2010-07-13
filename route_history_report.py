@@ -9,17 +9,15 @@ from numpy import array
 from pymongo import Connection, DESCENDING
 from memoize import lru_cache
 
-db = Connection('bang', 27017)['freeway']
-
 path = T.Proto('path')
 line = T.Proto('line')
 
 @lru_cache(1000)
-def getVds(id):
+def getVds(db, id):
     return db['vds'].find({'_id' : id}).next()
 
 @lru_cache(1000)
-def getLabel(freewayId, postMile):
+def getLabel(db, freewayId, postMile):
     return db['vds'].find_one({'freeway_id' : freewayId, 'abs_pm' : float(postMile)},
                           ["name"])['name']
 
@@ -39,8 +37,9 @@ def smoothSequence(x, kernelWidth=5):
 
 class Diagram(object):
    
-    def __init__(self, shadows=False, **kw):
+    def __init__(self, db, shadows=False, **kw):
         """kwargs go to plotPoints"""
+        self.db = db
         self.shadows = shadows
 
         self.width = 900
@@ -73,11 +72,11 @@ class Diagram(object):
                   [pos1t2spd, pos2t2spd, ...]] # newest row is ON TOP
         """
         vdsInRange = [row['_id'] for row in
-                      db['vds'].find({'freeway_id' : '101',
+                      self.db['vds'].find({'freeway_id' : '101',
                                       'abs_pm' : {'$gt' : 408, '$lt' : 425.5}},
                                      fields=['_id'])]
 
-        data = list(db['meas'].find({'vds_id' : {'$in' : vdsInRange}}
+        data = list(self.db['meas'].find({'vds_id' : {'$in' : vdsInRange}}
                                     ).sort('time', DESCENDING
                                            ).limit(10 * len(vdsInRange)))
         self.latestRow = data[0]
@@ -93,11 +92,11 @@ class Diagram(object):
         allPos = set()
         for measurements in measurementSets.values():
             for m in measurements:
-                vds = getVds(m['vds_id'])
+                vds = getVds(self.db, m['vds_id'])
                 if (vds['freeway_id'] == freewayId and
                     postMileLow < vds['abs_pm'] < postMileHigh and
                     vds['freeway_dir'] == freewayDir):
-                    allPos.add(getVds(m['vds_id'])['abs_pm'])
+                    allPos.add(getVds(self.db, m['vds_id'])['abs_pm'])
         positions = sorted(allPos)
         print "freewayDir %s, %s" % (freewayDir, positions[:5])
 
@@ -106,7 +105,7 @@ class Diagram(object):
 
             for m in measurements:
                 # (but consider beyond my strip, to see approaching traffic)
-                vds = getVds(m['vds_id'])
+                vds = getVds(self.db, m['vds_id'])
                 pos = vds['abs_pm']
                 if (vds['freeway_id'] == freewayId and
                     postMileLow < pos < postMileHigh and
@@ -247,7 +246,7 @@ class Diagram(object):
                 continue
             lastX = x
             tr = "translate(%s %s) rotate(-90)" % (x, base + 75)
-            elements.append(T.Tag('text')(transform=tr, class_="pos")["%6.2f %s" % (pos, getLabel('101', pos))])
+            elements.append(T.Tag('text')(transform=tr, class_="pos")["%6.2f %s" % (pos, getLabel(self.db, '101', pos))])
         return [], elements
     
     def makeSpeedCurves(self):

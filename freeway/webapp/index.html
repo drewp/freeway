@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
 "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml"
+xmlns:py="http://genshi.edgewall.org/"
+>
   <head>
     <style type="text/css" media="all">
     /* <![CDATA[ */
@@ -37,11 +39,19 @@
   <!--${Markup(table)}-->
 
   <div><h2>Southbound</h2>
-  ${Markup(diaSouth.render())}
+  <py:choose test="useSvg">
+    <py:when test="True">${Markup(diaSouth.render())}</py:when>
+    <py:when test="False"><img src="south.png?shadow=${'on' if shadows else 'off'}" width="900" height="500"/></py:when>
+  </py:choose>
   </div>
+
   <div><h2>Northbound</h2>
-  ${Markup(diaNorth.render())}
+  <py:choose test="useSvg">
+    <py:when test="True">${Markup(diaNorth.render())}</py:when>
+    <py:when test="False"><img src="north.png?shadow=${'on' if shadows else 'off'}" width="900" height="500"/></py:when>
+  </py:choose>
   </div>
+
   <div><a href="?shadow=off">(turn off shadows)</a></div>
   <div class="timing">
     <table>
