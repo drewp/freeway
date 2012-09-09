@@ -67,3 +67,5 @@ urls = (r"/", "root",
 w = web.application(urls, globals(), autoreload=False)
 application = w.wsgifunc()
 
+if __name__ == '__main__':
+    w.run()

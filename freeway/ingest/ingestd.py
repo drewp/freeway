@@ -2,8 +2,8 @@ import os, time, datetime, dateutil.tz
 import cPickle as pickle
 from glob import glob
 from twisted.internet import reactor
-from pymongo import bson, Connection
-
+from pymongo import Connection
+import bson
 from loop_data import parse5MinFile
 from detector import parseVdsConfig
 from memoize import lru_cache
