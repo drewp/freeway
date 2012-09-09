@@ -47,7 +47,7 @@ class Diagram(object):
         self.bottomMargin = 80
         
         self.pmLow = 408
-        self.pmHigh = 425.5
+        self.pmHigh = 416#425.5
         self.pixelPerMile = self.width / (self.pmHigh - self.pmLow)
 
         t1 = time.time()
