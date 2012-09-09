@@ -10,6 +10,14 @@ meas.12620 - meas.12786 plain        -> meas3
 new stuff is arriving on bang/freeway. needs to move to whatever the
 64bit one is.
 
+2011-01-29 db has this range:
+
+
+1278633900
+1296336300
+
+
+
 """
 import os, sys, bz2
 sys.path.insert(0, ".")
