@@ -1,4 +1,4 @@
-import os, time
+import os, time, datetime
 from twisted.internet import reactor
 from loop_data import parse5MinFile
 
@@ -37,6 +37,10 @@ class UpdateLoop(object):
         # timestamp is much older than my current clock (like 9.5
         # mins, today) so I'm not sure what to do
         delay = 5*60# max(5, nextDataTime - now)
+
+        nowHr = datetime.datetime.now().hour
+        if nowHr >= 22 or nowHr < 5:
+            delay = 30*60
         
         print "next download in %s sec" % delay
         reactor.callLater(delay, self.update)
