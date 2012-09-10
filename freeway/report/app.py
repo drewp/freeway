@@ -1,19 +1,17 @@
-
 import logging, web, dateutil.tz, datetime
 from web.contrib.template import render_genshi
-from pymongo import Connection, DESCENDING
-render = render_genshi('freeway/webapp', auto_reload=True)
-from freeway.webapp.render import toPng
+render = render_genshi('freeway/report', auto_reload=True)
+import freeway
+print freeway
+from freeway.db import getDb
 logging.basicConfig()
 log = logging.getLogger()
-
 log.setLevel(logging.DEBUG)
+logging.getLogger("monetdb").setLevel(logging.INFO)
 
 
 class root(object):
     def GET(self):
-        db = Connection('bang', 27017)['freeway']
-
         import segment_report
         reload(segment_report)
         import route_history_report
@@ -57,6 +55,7 @@ class renderedDiagram(object):
             shadows=shadows)
         web.header('Content-Type', 'image/png')
         web.header('Cache-Control', 'max-age=150')
+        from freeway.report.render import toPng
         return toPng(dia.render())
         
 
@@ -64,6 +63,7 @@ urls = (r"/", "root",
         r'/(north|south).png', 'renderedDiagram',
         )
 
+db = getDb()
 w = web.application(urls, globals(), autoreload=False)
 application = w.wsgifunc()
 

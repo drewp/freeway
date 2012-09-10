@@ -2,12 +2,11 @@
 diagram of one route, showing the last few measurements
 """
 from __future__ import division
-import pickle, time
+import time
 from nevow import tags as T, flat
 import numpy
 from numpy import array
-from pymongo import Connection, DESCENDING
-from memoize import lru_cache
+from freeway.lib.memoize import lru_cache
 
 path = T.Proto('path')
 line = T.Proto('line')

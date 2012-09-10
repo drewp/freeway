@@ -1,19 +1,13 @@
 #!/usr/bin/python
 
-import os, sys, optparse, inspect, time
-sys.path.append("/usr/share/pyshared/oldxml")
-from xml.utils import iso8601
-from twisted.web import http, server, client
-from twisted.web.resource import Resource
-from twisted.internet import reactor, defer, task
+import sys, time, datetime
+from twisted.internet import reactor
 import twisted.web
 from twisted.python import log
-from zope.interface import implements, providedBy
-from nevow import json, rend, appserver, inevow, tags as T, loaders, static
+from nevow import rend, appserver, inevow, tags as T, loaders
 
-from measurements import UpdatingMeasurements
-
-latestMeas = UpdatingMeasurements(runLoop=True, runOnce=False)
+#from measurements import UpdatingMeasurements
+#latestMeas = UpdatingMeasurements(runLoop=True, runOnce=False)
 
 class Main(rend.Page):
     docFactory = loaders.stan([T.raw('''<?xml version="1.0" encoding="utf-8"?>
@@ -68,11 +62,11 @@ table, td, th {
         return T.div(class_="timing")[
             T.table[
             T.tr[T.td["Data timestamp says "],
-                 T.td[iso8601.tostring(latestMeas.lastDataTime, time.altzone)]],
+                 T.td[datetime.datetime.fromtimestamp(latestMeas.lastDataTime).isoformat()]],
             T.tr[T.td["Last fetched at "],
-                 T.td[iso8601.tostring(latestMeas.lastFtpTime, time.altzone)]],
+                 T.td[datetime.datetime.fromtimestamp(latestMeas.lastFtpTime).isoformat()]],
             T.tr[T.td["Page generated at "],
-                 T.td[iso8601.tostring(int(time.time()), time.altzone)]],
+                 T.td[datetime.datetime.fromtimestamp(int(time.time())).isoformat()]],
             ]]
 
     def render_hist(self, ctx, data):
