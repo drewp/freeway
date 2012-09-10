@@ -1,6 +1,7 @@
 """
 diagram of one route, showing the last few measurements
 """
+
 from __future__ import division
 import time
 from nevow import tags as T, flat
@@ -10,15 +11,6 @@ from freeway.lib.memoize import lru_cache
 
 path = T.Proto('path')
 line = T.Proto('line')
-
-@lru_cache(1000)
-def getVds(db, id):
-    return db['vds'].find({'_id' : id}).next()
-
-@lru_cache(1000)
-def getLabel(db, freewayId, postMile):
-    return db['vds'].find_one({'freeway_id' : freewayId, 'abs_pm' : float(postMile)},
-                          ["name"])['name']
 
 
 #fix flaky graph, add server-rendered rsvg mode
@@ -70,19 +62,13 @@ class Diagram(object):
         speeds = [[pos1t1spd, pos2t1spd, ...],
                   [pos1t2spd, pos2t2spd, ...]] # newest row is ON TOP
         """
-        vdsInRange = [row['_id'] for row in
-                      self.db['vds'].find({'freeway_id' : '101',
-                                      'abs_pm' : {'$gt' : 408, '$lt' : 425.5}},
-                                     fields=['_id'])]
+        vdsInRange = self.db.vdsInRange('101', 408, 425.5)
 
-        data = list(self.db['meas'].find({'vds_id' : {'$in' : vdsInRange}}
-                                    ).sort('time', DESCENDING
-                                           ).limit(10 * len(vdsInRange)))
+        data = self.db.recentMeas(vdsInRange, 10 * len(vdsInRange))
         self.latestRow = data[0]
         measurementSets = {} # time : [meas]
         for row in data:
-            measurementSets.setdefault(row['time'], []).append(row)
-
+            measurementSets.setdefault(row['dataTime'], []).append(row)
 
         positions = []
         times = []
@@ -91,11 +77,11 @@ class Diagram(object):
         allPos = set()
         for measurements in measurementSets.values():
             for m in measurements:
-                vds = getVds(self.db, m['vds_id'])
+                vds = self.db.getVds(m['vds_id'])
                 if (vds['freeway_id'] == freewayId and
                     postMileLow < vds['abs_pm'] < postMileHigh and
                     vds['freeway_dir'] == freewayDir):
-                    allPos.add(getVds(self.db, m['vds_id'])['abs_pm'])
+                    allPos.add(self.db.getVds(m['vds_id'])['abs_pm'])
         positions = sorted(allPos)
         print "freewayDir %s, %s" % (freewayDir, positions[:5])
 
@@ -104,7 +90,7 @@ class Diagram(object):
 
             for m in measurements:
                 # (but consider beyond my strip, to see approaching traffic)
-                vds = getVds(self.db, m['vds_id'])
+                vds = self.db.getVds(m['vds_id'])
                 pos = vds['abs_pm']
                 if (vds['freeway_id'] == freewayId and
                     postMileLow < pos < postMileHigh and
@@ -112,10 +98,8 @@ class Diagram(object):
                     assert pos in allPos
                     speedAtPos[pos] = m['speed']
 
-            times.append(time.mktime(m['time'].timetuple())) # pick any measurement from the set
+            times.append(m['dataTime']) # pick any measurement from the set
             speeds.append([speedAtPos.get(pos, None) for pos in positions])
-
-
 
         return array(positions), array(times), array(speeds)
 
@@ -245,7 +229,10 @@ class Diagram(object):
                 continue
             lastX = x
             tr = "translate(%s %s) rotate(-90)" % (x, base + 75)
-            elements.append(T.Tag('text')(transform=tr, class_="pos")["%6.2f %s" % (pos, getLabel(self.db, '101', pos))])
+
+
+            txt = "%6.2f %s" % (pos, self.db.pmLabel('101', pos))
+            elements.append(T.Tag('text')(transform=tr, class_="pos")[txt])
         return [], elements
     
     def makeSpeedCurves(self):
@@ -255,6 +242,8 @@ class Diagram(object):
         for rowNum, (timestamp, speedRow) in enumerate(zip(self.times,
                                                            self.speeds)):
             meas = zip(self.positions, speedRow)
+            if len(meas) < 3:
+                continue
             smallestDiffMile = min(p2[0] - p1[0]
                                    for p1, p2 in zip(meas[:-1], meas[1:]))
 

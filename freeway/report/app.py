@@ -1,4 +1,5 @@
-import logging, web, dateutil.tz, datetime
+import logging, web, datetime
+from dateutil.tz import tzlocal
 from web.contrib.template import render_genshi
 render = render_genshi('freeway/report', auto_reload=True)
 import freeway
@@ -12,19 +13,19 @@ logging.getLogger("monetdb").setLevel(logging.INFO)
 
 class root(object):
     def GET(self):
-        import segment_report
-        reload(segment_report)
         import route_history_report
         reload(route_history_report)
+        #import segment_report
+        #reload(segment_report)
         #table = segment_report.table(latestMeas)
         shadows = web.input().get('shadow', 'on') !=  'off'
 
         diaNorth = route_history_report.Diagram(db, freewayDir='N', shadows=shadows)
         diaSouth = route_history_report.Diagram(db, freewayDir='S', shadows=shadows)
 
-        dataTime = diaNorth.latestRow['time'].replace(tzinfo=dateutil.tz.tzutc())
-        fetchTime = diaNorth.latestRow['fetchTime'].replace(tzinfo=dateutil.tz.tzutc())
-        now = datetime.datetime.now(dateutil.tz.tzlocal())
+        dataTime = datetime.datetime.fromtimestamp(diaNorth.latestRow['dataTime'], tzlocal())
+        fetchTime = datetime.datetime.fromtimestamp(diaNorth.latestRow['readTime'], tzlocal())
+        now = datetime.datetime.now(tzlocal())
 
         ua = web.ctx.environ['HTTP_USER_AGENT']
         print ua
@@ -34,8 +35,8 @@ class root(object):
         return render.index(
             #table=table,
             shadows=web.input().get('shadow', 'on') != 'off',
-            dataTime=dataTime.astimezone(dateutil.tz.tzlocal()),
-            fetchTime=fetchTime.astimezone(dateutil.tz.tzlocal()),
+            dataTime=dataTime,
+            fetchTime=fetchTime,
             now=now,
             useSvg=useSvg,
             diaNorth=diaNorth,

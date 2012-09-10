@@ -5,30 +5,22 @@ run this occasionally.
 first get a new xml file:
 wget http://pems.dot.ca.gov/vds_config.xml
 
-then run this program to replace the 'vds' collection in mongo
+then run this program to replace the 'vds' table in monet
 
 """
 
-import sys
-sys.path.insert(0, ".")
-from pymongo import Connection, bson
+from freeway.db import getDb
 from freeway.ingest import detector
 
-db = Connection('bang', 27017)['freeway']
+db = getDb()
 
 newData = detector.parseVdsConfig("vds_config.xml")
 
-db.drop_collection('vds')
+
+rows = []
 
 for id, vds in newData.items():
-    vds['_id'] = str(id)
+    vds['id'] = id
+    rows.append(vds)
 
-    vds['abs_pm'] = float(vds['abs_pm'])
-    vds['pos'] = bson.SON([('longitude', float(vds['longitude'])),
-                           ('latitude', float(vds['latitude']))])
-    del vds['longitude']
-    del vds['latitude']
-    
-    db['vds'].save(vds)
-
-
+db.replaceVds(rows)
