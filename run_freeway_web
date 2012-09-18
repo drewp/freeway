@@ -1,4 +1,5 @@
 #!/bin/sh
 
 export PYTHONPATH=. 
-exec bin/spawning -p 8009 --processes=4 --threads=0 --reload=dev freeway.report.app.application
+# add --reload=dev for autoreload
+exec bin/spawning -p 8009 --processes=4 --threads=0 freeway.report.app.application

@@ -8,6 +8,7 @@ from nevow import tags as T, flat
 import numpy
 from numpy import array
 from freeway.lib.memoize import lru_cache
+from freeway.db import logTime
 
 path = T.Proto('path')
 line = T.Proto('line')
@@ -41,15 +42,14 @@ class Diagram(object):
         self.pmHigh = 416#425.5
         self.pixelPerMile = self.width / (self.pmHigh - self.pmLow)
 
-        t1 = time.time()
         self.positions, self.times, self.speeds = self.plotPoints(**kw)
-        print "fetch data in %s" % (time.time() - t1)
             
         self.speedRange = (
             0, #self.speeds.min() - 3,
             80, #self.speeds.max() + 3
             )
 
+    @logTime
     def plotPoints(self, freewayId='101',
                    postMileLow=408, postMileHigh=425.5, freewayDir='S'):
         """
@@ -70,19 +70,11 @@ class Diagram(object):
         for row in data:
             measurementSets.setdefault(row['dataTime'], []).append(row)
 
-        positions = []
         times = []
         speeds = []
 
-        allPos = set()
-        for measurements in measurementSets.values():
-            for m in measurements:
-                vds = self.db.getVds(m['vds_id'])
-                if (vds['freeway_id'] == freewayId and
-                    postMileLow < vds['abs_pm'] < postMileHigh and
-                    vds['freeway_dir'] == freewayDir):
-                    allPos.add(self.db.getVds(m['vds_id'])['abs_pm'])
-        positions = sorted(allPos)
+        positions = self.allPositions(measurementSets,
+                                      freewayId, postMileLow, postMileHigh, freewayDir)
         print "freewayDir %s, %s" % (freewayDir, positions[:5])
 
         for measurements in measurementSets.values():
@@ -95,7 +87,6 @@ class Diagram(object):
                 if (vds['freeway_id'] == freewayId and
                     postMileLow < pos < postMileHigh and
                     vds['freeway_dir'] == freewayDir):
-                    assert pos in allPos
                     speedAtPos[pos] = m['speed']
 
             times.append(m['dataTime']) # pick any measurement from the set
@@ -103,7 +94,21 @@ class Diagram(object):
 
         return array(positions), array(times), array(speeds)
 
-        
+    @logTime
+    def allPositions(self, measurementSets,
+                     freewayId, postMileLow, postMileHigh, freewayDir):
+        allPos = set()
+        for measurements in measurementSets.values():
+            for m in measurements:
+                vds = self.db.getVds(m['vds_id'])
+                if (vds['freeway_id'] == freewayId and
+                    postMileLow < vds['abs_pm'] < postMileHigh and
+                    vds['freeway_dir'] == freewayDir):
+                    allPos.add(self.db.getVds(m['vds_id'])['abs_pm'])
+        positions = sorted(allPos)
+        return positions
+
+    @logTime
     def render(self):
         defs = []
         elements = []
