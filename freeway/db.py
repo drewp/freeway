@@ -21,7 +21,6 @@ class Db(object):
     """
     def __init__(self, host='bang', database='freeway'):
         self.conn = monetdb.sql.Connection(host=host, database=database)
-        self.curs = self.conn.cursor()
 
     @logTime
     def recentMeas(self, vds, limit):
@@ -31,6 +30,7 @@ class Db(object):
 
         result rows are a limited dict
         """
+        curs = self.conn.cursor()
         q = """select vds_id, speed, dataTime, readTime
                from meas
                where vds_id in (VDS_CHOICES)
@@ -38,9 +38,9 @@ class Db(object):
                limit %s""".replace('VDS_CHOICES',
                                    ",".join("%s" for field in range(len(vds))))
         
-        self.curs.execute(q, tuple(vds) + (limit,))
+        curs.execute(q, tuple(vds) + (limit,))
         out = []
-        for row in self.curs:
+        for row in curs:
             out.append({'vds_id' : row[0],
                         'speed' : row[1],
                         'dataTime' : row[2],
@@ -54,9 +54,9 @@ class Db(object):
         curs = self.conn.cursor()
         try:
             curs.execute("drop table vds")
-            curs.execute("commit")
+            self.conn.commit()
         except OperationalError:
-            curs.execute("rollback")
+            self.conn.rollback()
 
         curs.execute("""
             create table vds (
@@ -69,7 +69,7 @@ class Db(object):
               latitude real,
               longitude real
               )""")
-        curs.execute("commit")
+        self.conn.commit()
         for row in rows:
             curs.execute("""insert into vds (
               id,
@@ -90,21 +90,23 @@ class Db(object):
               %(latitude)s,
               %(longitude)s
               )""", row)
-        curs.execute("commit")
+        self.conn.commit()
 
     @lru_cache(1000)
     def getVds(self, id):
-        self.curs.execute("""
+        curs = self.conn.cursor()
+        curs.execute("""
           select freeway_id, freeway_dir, abs_pm
           from vds
           where id=%s""", id)
-        row = iter(self.curs).next()
+        row = iter(curs).next()
         return dict(zip(['freeway_id', 'freeway_dir', 'abs_pm'], row))
 
     @logTime
     @lru_cache(1000)
     def vdsInRange(self, freeway_id, pmLow, pmHigh):
-        self.curs.execute("""
+        curs = self.conn.cursor()
+        curs.execute("""
           select id
           from vds
           where freeway_id = %(freeway_id)s and
@@ -113,15 +115,16 @@ class Db(object):
           """, {'freeway_id': freeway_id,
                 'pmLow': pmLow,
                 'pmHigh': pmHigh})
-        return [row[0] for row in self.curs]
+        return [row[0] for row in curs]
 
     @lru_cache(1000)
     def pmLabel(self, freeway_id, pm):
-        self.curs.execute("""
+        curs = self.conn.cursor()
+        curs.execute("""
           select name from vds
           where freeway_id = %(freeway_id)s and abs_pm = %(pm)s
           """, {'freeway_id':freeway_id, 'pm':float(pm)})
-        return iter(self.curs).next()[0]
+        return iter(curs).next()[0]
 
     def resetSchema(self):
         try:
@@ -153,9 +156,9 @@ class Db(object):
         timestamp (secs) is the timestamp in the pems file we got
         samples is a list of dicts of data
         """
-
+        curs = self.conn.cursor()
         for s in samples:
-            self.curs.execute("""INSERT INTO meas (
+            curs.execute("""INSERT INTO meas (
                   readTime,
                   dataTime,
                   vds_id,
@@ -169,7 +172,8 @@ class Db(object):
                   num_samples,
                   pct_observed
                   ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                         (now, timestamp,
+                         (now,
+                          timestamp,
                           s.get('vds_id'),
                           s.get('flow'),
                           s.get('occupancy'),
@@ -180,7 +184,8 @@ class Db(object):
                           s.get('delay'),
                           s.get('num_samples'),
                           s.get('pct_observed')))
-        self.curs.execute("commit")
+
+        self.conn.commit()
 
 def getDb():
     return Db()
