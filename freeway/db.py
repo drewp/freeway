@@ -21,6 +21,7 @@ class Db(object):
     """
     def __init__(self, host='bang', database='freeway'):
         self.conn = monetdb.sql.Connection(host=host, database=database)
+        self.args = dict(host=host, database=database)
 
     @logTime
     def recentMeas(self, vds, limit):
@@ -30,6 +31,8 @@ class Db(object):
 
         result rows are a limited dict
         """
+        
+        self.conn = monetdb.sql.Connection(**self.args)
         curs = self.conn.cursor()
         q = """select vds_id, speed, dataTime, readTime
                from meas
