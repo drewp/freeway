@@ -195,6 +195,9 @@ class VdsMongo(object):
         
 class Db(VdsMongo):
     """
+    combined database API for clients to use. The meas and vds data
+    might come from different kinds of places.
+    
     all times are integer unix seconds, even in the db
     """
     def __init__(self):
