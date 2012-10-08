@@ -33,3 +33,11 @@ freeway/webapp/ web.py rewrite
 Sources:
 
 wget http://pems.dot.ca.gov/vds_config.xml
+
+migration:
+old single bzips: 12322 to 12389   ok
+untars 12390 to 12786 running on slash:freeway/untar), part rsyncd to dash
+mongo 12786 to 13472 ok
+monet 13472 to current 13495, approx. running on dash. needs final update.
+
+

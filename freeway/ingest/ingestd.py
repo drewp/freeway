@@ -1,4 +1,4 @@
-import os, time, datetime
+import os, time, datetime, traceback
 from twisted.internet import reactor
 from loop_data import parse5MinFile
 
@@ -31,6 +31,7 @@ class UpdateLoop(object):
             self.db.save(timestamp, now, samples)
         except Exception, e:
             print "update failed:", e
+            traceback.print_exc()
             nextDataTime = now
 
         # it would be nice to get in phase with their data, but their

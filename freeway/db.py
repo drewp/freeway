@@ -1,6 +1,7 @@
-import time, logging
-import monetdb.sql
-from monetdb.monetdb_exceptions import OperationalError
+from __future__ import division
+import time, logging, os, struct, datetime
+from dateutil.tz import tzutc
+import pymongo
 from freeway.lib.memoize import lru_cache
 log = logging.getLogger()
 
@@ -15,143 +16,198 @@ def logTime(func):
         return ret
     return inner
 
-class Db(object):
+class MeasFixedFile(object):
     """
-    all times are integer unix seconds, even in the db
+    file named meas.12786 has any measurements with a dataTime value
+    of 12786xxxxx. The measurements are in order but may not be evenly
+    spaced.
+
+    The whole file is rewritten when we have to insert. I don't
+    currently dedup, so try not to write dups.
+
+    Some values are rounded. Nulls become 0.
     """
-    def __init__(self, host='bang', database='freeway'):
-        self.conn = monetdb.sql.Connection(host=host, database=database)
-        self.args = dict(host=host, database=database)
+    def __init__(self, topDir):
+        self.topDir = topDir
+        # these 32 bit times will break in 2038
+        self.structFormat = "!II6sHHHHHHHBB"
+        self.structSize = struct.calcsize(self.structFormat)
 
-    @logTime
-    def recentMeas(self, vds, limit):
+        # (name, file) cache, just to save close/open calls while writing
+        self.currentFile = None 
+
+    def makeFilename(self, num):
+        return os.path.join(self.topDir, "meas.%d" % num)
+
+    def recentMeas(self, vdsFilter=None):
+        """iterator through the meas records in backwards order
+
+        optionally limit to only vds_id strings in the given list
+
+        this does not use self.currentFile so it can notice new data
+        written by other processes
         """
-        return the most recent measurement rows for any of the given
-        vds_id values. limit applies to the total number of rows
+        for fileNumber in xrange(int((time.time() // 100000)+1), 0, -1):
+            filename = self.makeFilename(fileNumber)
+            try:
+                f = open(filename, "rb") # error here if there's a gap in the files
+                f.seek(-self.structSize, 2)
+                while True:
+                    raw = f.read(self.structSize)
+                    if vdsFilter is None or raw[8:8+6] in vdsFilter:
+                        yield self.unpack(raw)
+                    f.seek(-self.structSize*2, 1) # error here if we seek all the way past 0
+            except IOError:
+                continue
 
-        result rows are a limited dict
-        """
-        
-        self.conn = monetdb.sql.Connection(**self.args)
-        curs = self.conn.cursor()
-        q = """select vds_id, speed, dataTime, readTime
-               from meas
-               where vds_id in (VDS_CHOICES)
-               order by dataTime desc
-               limit %s""".replace('VDS_CHOICES',
-                                   ",".join("%s" for field in range(len(vds))))
-        
-        curs.execute(q, tuple(vds) + (limit,))
-        out = []
-        for row in curs:
-            out.append({'vds_id' : row[0],
-                        'speed' : row[1],
-                        'dataTime' : row[2],
-                        'readTime' : row[3]})
-        return out
+    def writeMeas(self, m):
+        outFile = self.makeFilename(m['dataTime'] // 100000)
+        packed = self.pack(m)
 
+        if self.currentFile is not None and self.currentFile[0] == outFile:
+            f = self.currentFile[1]
+        else:
+            if self.currentFile is not None:
+                self.currentFile[1].close()
+
+            print "opening", outFile
+            try:
+                f = open(outFile, "rb+")
+            except IOError:
+                f = open(outFile, "wb+")
+            self.currentFile = outFile, f
+
+        try:
+            f.seek(-self.structSize, 2)
+            lastRec = self.unpack(f.read(self.structSize))
+        except IOError: # zero-length file
+            lastRec = {'dataTime':0}
+        
+        if m['dataTime'] >= lastRec['dataTime']:
+            f.write(packed)
+        else:
+            print "lastRec was %s, new rec is %s, rewriting" % (
+                lastRec['dataTime'], m['dataTime'])
+            records = self._allRecords(f)
+            records.append(packed)
+            records.sort()
+            f.seek(0, 0)
+            for rec in records:
+                f.write(rec)
+
+    def _allRecords(self, f):
+        f.seek(0, 2)
+        num = f.tell() // self.structSize
+        f.seek(0, 0)
+        return [f.read(self.structSize) for loop in range(num)]
+
+    def merge(self, firstFullPath, otherFullPath, outFullPath):
+        """used during migrations"""
+        recs1 = set(self._allRecords(open(firstFullPath)))
+        recs2 = set(self._allRecords(open(otherFullPath)))
+        allRecs = sorted(recs1.union(recs2))
+        print "%s had %s; %s had %s; output has %s unique records" % (
+            firstFullPath, len(recs1), otherFullPath, len(recs2), len(allRecs))
+        f = open(outFullPath, "wb")
+        for rec in allRecs:
+            f.write(rec)
+        f.close()
+
+    def pack(self, meas):
+        print "mymeas", repr(meas)
+        q = meas.get('q', None) or 0 # sometimes null- stored as 0
+        return struct.pack(self.structFormat,
+                           meas['dataTime'],
+                           meas['readTime'],
+                           str(meas['vds_id']),
+                           min(meas['flow'], 65535),
+                           int(meas['occupancy'] * 65535),
+                           int(meas['speed'] * 100),
+                           int(meas['vmt'] * 10),
+                           int(meas['vht'] * 10),
+                           int(q * 10), 
+                           int(meas['delay'] * 10),
+                           meas['num_samples'],
+                           meas['pct_observed'])
+
+    def unpack(self, s):
+        d = struct.unpack(self.structFormat, s)
+        return dict(
+            dataTime=d[0],
+            readTime=d[1],
+            vds_id=d[2],
+            flow=d[3],
+            occupancy=d[4] / 65535,
+            speed=d[5] / 100,
+            vmt=d[6] / 10,
+            vht=d[7] / 10,
+            q=d[8] / 10,
+            delay=d[9] / 10,
+            num_samples=d[10],
+            pct_observed=d[11])
+            
+class VdsMongo(object):
+    def initVdsMongo(self):
+        self.vdsMongo = pymongo.Connection("bang")['freeway']['vds']
+        
     def replaceVds(self, rows):
         """
-        drop and recreate the whole vds table with these rows, specified as dicts
+        drop and recreate the whole vds table with these rows,
+        specified as dicts
+
+        in an older version my mongo doc looked like this:
+        { "_id" : "401391",
+          "name" : "101/280/680 i/c on ramp loop to",
+          "type" : "ML",
+          "abs_pm" : 0.18,
+          "pos" : { "longitude" : -121.85467, "latitude" : 37.337881 },
+          "freeway_id" : "280",
+          "freeway_dir" : "S"
+        }
         """
-        curs = self.conn.cursor()
-        try:
-            curs.execute("drop table vds")
-            self.conn.commit()
-        except OperationalError:
-            self.conn.rollback()
-
-        curs.execute("""
-            create table vds (
-              id varchar(255),
-              name varchar(255),
-              type varchar(255),
-              freeway_id varchar(255),
-              freeway_dir varchar(5),
-              abs_pm real,
-              latitude real,
-              longitude real
-              )""")
-        self.conn.commit()
-        for row in rows:
-            curs.execute("""insert into vds (
-              id,
-              name,
-              type,
-              freeway_id,
-              freeway_dir,
-              abs_pm,
-              latitude,
-              longitude
-              ) values (
-              %(id)s,
-              %(name)s,
-              %(type)s,
-              %(freeway_id)s,
-              %(freeway_dir)s,
-              %(abs_pm)s,
-              %(latitude)s,
-              %(longitude)s
-              )""", row)
-        self.conn.commit()
-
+        self.vdsMongo.drop()
+        self.vdsMongo.ensure_index([('id', 1), ('abs_pm', 1)])
+        self.vdsMongo.insert(rows, safe=True)
+                   
     @lru_cache(1000)
     def getVds(self, id):
-        curs = self.conn.cursor()
-        curs.execute("""
-          select freeway_id, freeway_dir, abs_pm
-          from vds
-          where id=%s""", id)
-        row = iter(curs).next()
-        return dict(zip(['freeway_id', 'freeway_dir', 'abs_pm'], row))
+        doc = self.vdsMongo.find_one({"id":id})
+        if doc is None:
+            raise ValueError
+        return doc
 
     @logTime
     @lru_cache(1000)
     def vdsInRange(self, freeway_id, pmLow, pmHigh):
-        curs = self.conn.cursor()
-        curs.execute("""
-          select id
-          from vds
-          where freeway_id = %(freeway_id)s and
-          abs_pm >= %(pmLow)s and
-          abs_pm <= %(pmHigh)s
-          """, {'freeway_id': freeway_id,
-                'pmLow': pmLow,
-                'pmHigh': pmHigh})
-        return [row[0] for row in curs]
+        out = []
+        for doc in self.vdsMongo.find({'freeway_id':freeway_id,
+                                       'abs_pm' : {'$gte' : pmLow,
+                                                   '$lte' : pmHigh}}):
+            out.append(doc['id'])
+        return out
 
     @lru_cache(1000)
     def pmLabel(self, freeway_id, pm):
-        curs = self.conn.cursor()
-        curs.execute("""
-          select name from vds
-          where freeway_id = %(freeway_id)s and abs_pm = %(pm)s
-          """, {'freeway_id':freeway_id, 'pm':float(pm)})
-        return iter(curs).next()[0]
+        doc = self.vdsMongo.find_one({"freeway_id":freeway_id, 'abs_pm':pm})
+        if doc is None:
+            raise ValueError(str((freeway_id, pm)))
+        return doc['name']
+        
+class Db(VdsMongo):
+    """
+    all times are integer unix seconds, even in the db
+    """
+    def __init__(self):
+        self.fixedFile = MeasFixedFile("/opt/freeway")
+        self.initVdsMongo()
 
-    def resetSchema(self):
-        try:
-            self.conn.execute("drop table meas")
-        except OperationalError:
-            pass
-        self.conn.execute("""
-            create table meas (
-              readTime int,
-              dataTime int,
-              vds_id varchar(10),
-              flow real,
-              occupancy real,
-              speed real,
-              vmt real,
-              vht real,
-              q real,
-              delay real,
-              num_samples int,
-              pct_observed real
-              )
-            """)
-        self.conn.commit()
-        print "created meas table"
+    @logTime
+    def recentMeas(self, vds, limit):
+        out = []
+        for meas in self.fixedFile.recentMeas(vds):
+            out.append(meas)
+            if len(out) >= limit:
+                return out
         
     def save(self, timestamp, now, samples):
         """
@@ -159,36 +215,11 @@ class Db(object):
         timestamp (secs) is the timestamp in the pems file we got
         samples is a list of dicts of data
         """
-        curs = self.conn.cursor()
-        for s in samples:
-            curs.execute("""INSERT INTO meas (
-                  readTime,
-                  dataTime,
-                  vds_id,
-                  flow,
-                  occupancy,
-                  speed,
-                  vmt,
-                  vht,
-                  q,
-                  delay,
-                  num_samples,
-                  pct_observed
-                  ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                         (now,
-                          timestamp,
-                          s.get('vds_id'),
-                          s.get('flow'),
-                          s.get('occupancy'),
-                          s.get('speed'),
-                          s.get('vmt'),
-                          s.get('vht'),
-                          s.get('q'),
-                          s.get('delay'),
-                          s.get('num_samples'),
-                          s.get('pct_observed')))
+        for m in samples:
+            m['dataTime'] = timestamp
+            m['readTime'] = now
+            self.fixedFile.writeMeas(m)
 
-        self.conn.commit()
-
+        
 def getDb():
     return Db()
