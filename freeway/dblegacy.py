@@ -140,3 +140,106 @@ class VdsMonet(object):
 class MeasMonet(object):
     def __init__(self, host='bang', database='freeway'):
         self.conn = monetdb.sql.Connection(host=host, database=database)
+
+    def allMonetMeas(self):
+        """stream all rows, for migration"""
+
+        self.conn = monetdb.sql.Connection(**self.args)
+        curs = self.conn.cursor()
+        q = """select *
+               from meas
+               where dataTime > 1349500000
+               order by dataTime asc """
+        
+        curs.execute(q)
+        fields = 'readTime dataTime vds_id flow occupancy speed vmt vht q delay num_samples pct_observed'.split()
+        for row in curs:
+            yield dict(zip(fields, row))
+                
+    @logTime
+    def recentMeasMonet(self, vds, limit):
+        """
+        return the most recent measurement rows for any of the given
+        vds_id values. limit applies to the total number of rows
+
+        result rows are a limited dict
+        """
+        
+        self.conn = monetdb.sql.Connection(**self.args)
+        curs = self.conn.cursor()
+        q = """select vds_id, speed, dataTime, readTime
+               from meas
+               where vds_id in (VDS_CHOICES)
+               order by dataTime desc
+               limit %s""".replace('VDS_CHOICES',
+                                   ",".join("%s" for field in range(len(vds))))
+        
+        curs.execute(q, tuple(vds) + (limit,))
+        out = []
+        for row in curs:
+            out.append({'vds_id' : row[0],
+                        'speed' : row[1],
+                        'dataTime' : row[2],
+                        'readTime' : row[3]})
+        return out
+
+    def resetSchema(self):
+        try:
+            self.conn.execute("drop table meas")
+        except OperationalError:
+            pass
+        self.conn.execute("""
+            create table meas (
+              readTime int,
+              dataTime int,
+              vds_id varchar(10),
+              flow real,
+              occupancy real,
+              speed real,
+              vmt real,
+              vht real,
+              q real,
+              delay real,
+              num_samples int,
+              pct_observed real
+              )
+            """)
+        self.conn.commit()
+        print "created meas table"
+
+    def save(self, timestamp, now, samples):
+        """
+        now (secs) is when we asked for the data
+        timestamp (secs) is the timestamp in the pems file we got
+        samples is a list of dicts of data
+        """
+        curs = self.conn.cursor()
+        for s in samples:
+            curs.execute("""INSERT INTO meas (
+                  readTime,
+                  dataTime,
+                  vds_id,
+                  flow,
+                  occupancy,
+                  speed,
+                  vmt,
+                  vht,
+                  q,
+                  delay,
+                  num_samples,
+                  pct_observed
+                  ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                         (now,
+                          timestamp,
+                          s.get('vds_id'),
+                          s.get('flow'),
+                          s.get('occupancy'),
+                          s.get('speed'),
+                          s.get('vmt'),
+                          s.get('vht'),
+                          s.get('q'),
+                          s.get('delay'),
+                          s.get('num_samples'),
+                          s.get('pct_observed')))
+
+        self.conn.commit()
