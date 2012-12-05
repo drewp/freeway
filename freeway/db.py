@@ -46,8 +46,11 @@ class MeasFixedFile(object):
 
         this does not use self.currentFile so it can notice new data
         written by other processes
+
+        may return nothing if things go wrong
         """
-        for fileNumber in xrange(int((time.time() // 100000)+1), 0, -1):
+        start = int((time.time() // 100000)+1)
+        for fileNumber in xrange(start, start - 100, -1):
             filename = self.makeFilename(fileNumber)
             try:
                 f = open(filename, "rb") # error here if there's a gap in the files
