@@ -5,7 +5,7 @@ from freeway.ingest.loop_data import parse5MinFile
 
 dataTime, _ = parse5MinFile(os.path.join(os.path.dirname(__file__), "spool/5minagg_latest.txt.gz"))
 late = 5*int((time.time() - dataTime)/5)
-if late > 40*60:
+if late > 70*60:
     print "WARNING - data is %s seconds old" % late
     raise SystemExit(1)
 print "OK - %s seconds old" % late
