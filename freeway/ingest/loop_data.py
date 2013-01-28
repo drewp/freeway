@@ -35,7 +35,6 @@ def parse5MinFile(filename):
     for line in lines[1:]:
         fields = line.split(',')
         d = {'vds_id'      : fields[0],
-             'delay'       : float(fields[8]),
              'num_samples' : int(fields[9]),
              'pct_observed' : float(fields[10]),
              }
@@ -45,6 +44,7 @@ def parse5MinFile(filename):
         if fields[4]: d['vmt'] = float(fields[4])
         if fields[5]: d['vht'] = float(fields[5])
         if fields[6]: d['q'] = float(fields[6])
+        if fields[8]: d['delay'] = float(fields[8])
 
         result.append(d)
 

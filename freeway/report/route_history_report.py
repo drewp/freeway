@@ -259,6 +259,8 @@ class Diagram(object):
                 except TypeError:
                     continue
 
+            if not pts:
+                continue
             d = "M%.02f,%.02f" % tuple(pts[0])
             for p1, p2 in zip(pts[:-1], pts[1:]):
                 d += " S%.02f,%.02f %.02f,%.02f" % (
