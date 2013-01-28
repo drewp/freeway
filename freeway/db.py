@@ -49,6 +49,7 @@ class MeasFixedFile(object):
 
         may return nothing if things go wrong
         """
+        vdsFilter = [str(v) for v in vdsFilter]
         start = int((time.time() // 100000)+1)
         for fileNumber in xrange(start, start - 100, -1):
             filename = self.makeFilename(fileNumber)
